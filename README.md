@@ -32,18 +32,18 @@ Requires **Node.js 22+** and Docker for PostgreSQL.
 ```bash
 docker compose up -d postgres
 cp .env.example .env
-# Export DATABASE_URL and WEBHOOK_SECRETS_JSON from .env in your shell.
+# Replace the demonstration secret before any remotely reachable deployment.
 npm install
-npm run migrate
+node --env-file=.env scripts/migrate.cjs
 npm run build
-npm start
+node --env-file=.env dist/main.js
 ```
 
 In another terminal, with `DEMO_SECRET` set to the same key for tenant
 `demo`, run:
 
 ```bash
-node scripts/send-demo.cjs
+node --env-file=.env examples/send-demo.cjs
 ```
 
 The request returns `202` only after its event is durably recorded.
@@ -53,6 +53,7 @@ The scheduled worker claims and acknowledges it separately.
 
 ```bash
 npm install
+# DATABASE_URL must point at an isolated, disposable test database.
 npm run migrate
 npm test -- --coverage
 npm run typecheck
