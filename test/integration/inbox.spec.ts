@@ -43,7 +43,9 @@ describe('real PostgreSQL inbox / NestJS HTTP contracts', () => {
       rawBody: true, bodyParser: false, logger: false,
     });
     app.useBodyParser('json', { limit: '256kb' });
-    await app.init();
+    // Bind one HTTP listener before running parallel requests (supertest should
+    // not repeatedly start the same unbound Nest HTTP server concurrently).
+    await app.listen(0, '127.0.0.1');
     inbox = app.get(InboxService);
   });
 
