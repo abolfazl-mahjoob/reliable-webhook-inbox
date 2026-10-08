@@ -14,6 +14,14 @@ times concurrently, and a server may crash immediately after replying
 `202 Accepted`. The code illustrates how to preserve events and process
 them without assuming networks, processes or delivery are reliable.
 
+## HTTP contract
+
+`POST /webhooks/:tenantId` accepts an `order.paid` JSON event with
+`eventId` and `orderId`, HMAC-signed using a timestamp and event ID
+header. A durable event returns HTTP `202`; replay with identical bytes
+returns `202` and `duplicate: true`, while reusing the same event ID
+for a different payload returns `409`. Health check: `GET /health`.
+
 ## Features
 
 - HMAC-SHA256 verified against **exact raw request bytes** (not reserialized JSON)
