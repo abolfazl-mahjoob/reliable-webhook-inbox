@@ -176,4 +176,29 @@ describe('real PostgreSQL inbox / NestJS HTTP contracts', () => {
     expect((await db.query("SELECT count(*)::int AS n FROM inbox_events WHERE status='completed'"))
       .rows[0].n).toBe(2);
   });
+
+  test('poison events retry with bounded backoff then enter dead letter', async () => {
+    await post('evt-poison');
+    await db.query(
+      `UPDATE inbox_events SET payload=$1::jsonb WHERE event_id='evt-poison'`,
+      [JSON.stringify({ eventId: 'evt-poison', orderId: 'order-x', kind: 'unsupported' })],
+    );
+    for (let attempt = 1; attempt <= 5; attempt++) {
+      await db.query(
+        "UPDATE inbox_events SET available_at=now()-INTERVAL '1 second' WHERE event_id='evt-poison'",
+      );
+      await inbox.drain();
+      const result = await db.query(
+        "SELECT status,attempts,last_error,available_at FROM inbox_events WHERE event_id='evt-poison'",
+      );
+      expect(result.rows[0].attempts).toBe(attempt);
+      expect(result.rows[0].status).toBe(attempt === 5 ? 'dead' : 'pending');
+      expect(result.rows[0].last_error).toBe('Error');
+      if (attempt < 5) {
+        expect(new Date(result.rows[0].available_at).getTime()).toBeGreaterThan(Date.now());
+      }
+    }
+    expect((await db.query('SELECT * FROM processed_orders')).rowCount).toBe(0);
+  });
+
 });
