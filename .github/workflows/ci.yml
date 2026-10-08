@@ -1,0 +1,84 @@
+name: quality-gate
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: webhook-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  unit-and-integration:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        node: ['22', '24']
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: webhooks
+          POSTGRES_PASSWORD: webhooks_test
+          POSTGRES_DB: webhooks
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U webhooks -d webhooks"
+          --health-interval 3s --health-timeout 5s --health-retries 15
+    env:
+      DATABASE_URL: postgresql://webhooks:webhooks_test@localhost:5432/webhooks
+      WEBHOOK_SECRETS_JSON: '{"demo":"integration-example-secret-not-for-production-12345"}'
+      DISABLE_SCHEDULED_WORKER: 'true'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+      - run: npm install --no-audit --no-fund
+      - run: npm run typecheck
+      - run: npm run build
+      - run: npm run migrate
+      - run: npm test -- --coverage --coverageReporters=text
+      - run: npm audit --omit=dev --audit-level=high
+
+  container-smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: webhooks
+          POSTGRES_PASSWORD: webhooks_test
+          POSTGRES_DB: webhooks
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U webhooks -d webhooks"
+          --health-interval 3s --health-timeout 5s --health-retries 15
+    env:
+      DATABASE_URL: postgresql://webhooks:webhooks_test@localhost:5432/webhooks
+      WEBHOOK_SECRETS_JSON: '{"demo":"integration-example-secret-not-for-production-12345"}'
+    steps:
+      - uses: actions/checkout@v4
+      - run: docker build -t webhook-inbox:ci .
+      - run: docker run --rm --network host -e DATABASE_URL webhook-inbox:ci node scripts/migrate.cjs
+      - name: Start container and verify HTTP health
+        run: |
+          docker run --rm -d --network host --name webhook-smoke \
+            -e DATABASE_URL -e WEBHOOK_SECRETS_JSON webhook-inbox:ci
+          for i in $(seq 1 30); do
+            if curl -fsS http://127.0.0.1:3000/health; then exit 0; fi
+            sleep 1
+          done
+          docker logs webhook-smoke
+          exit 1
+      - if: always()
+        run: docker stop webhook-smoke || true
