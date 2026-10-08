@@ -1,0 +1,43 @@
+{
+  "name": "reliable-webhook-inbox",
+  "version": "0.1.0",
+  "private": false,
+  "description": "A transactional, authenticated and retry-safe webhook inbox in NestJS and PostgreSQL",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "start": "node dist/main.js",
+    "start:dev": "node --watch dist/main.js",
+    "test": "jest --runInBand",
+    "test:unit": "jest --runInBand --testPathPattern=unit",
+    "test:integration": "jest --runInBand --testPathPattern=integration",
+    "test:cov": "jest --runInBand --coverage",
+    "migrate": "node scripts/migrate.cjs",
+    "typecheck": "tsc --noEmit -p tsconfig.build.json",
+    "format:check": "prettier --check \"src/**/*.ts\" \"test/**/*.ts\"",
+    "format": "prettier --write \"src/**/*.ts\" \"test/**/*.ts\""
+  },
+  "dependencies": {
+    "@nestjs/common": "^11.1.0",
+    "@nestjs/core": "^11.1.0",
+    "@nestjs/platform-express": "^11.1.0",
+    "@nestjs/schedule": "^6.0.0",
+    "pg": "^8.13.0",
+    "reflect-metadata": "^0.2.2",
+    "rxjs": "^7.8.1"
+  },
+  "devDependencies": {
+    "@types/express": "^5.0.0",
+    "@types/jest": "^29.5.0",
+    "@types/node": "^22.10.0",
+    "@types/pg": "^8.11.0",
+    "@types/supertest": "^6.0.0",
+    "jest": "^29.7.0",
+    "prettier": "^3.4.0",
+    "supertest": "^6.3.4",
+    "ts-jest": "^29.2.0",
+    "typescript": "^5.7.3"
+  }
+}
