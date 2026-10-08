@@ -3,7 +3,6 @@ import {
   Inject,
   Injectable,
 } from '@nestjs/common';
-import { randomUUID } from 'node:crypto';
 import type { Pool, PoolClient } from 'pg';
 import { DB } from './database';
 import { authenticateWebhook, parseSecrets, SignedHeaders } from './security/webhook-signature';
@@ -149,15 +148,15 @@ export class InboxService {
     // Error details are deliberately not persisted: they may contain PII/secrets.
     // Jitter reduces synchronized retry bursts. Cap exponential growth.
     const errorCode = reason instanceof Error ? reason.name : 'UnknownError';
-    const retryMs = 1_000 + Math.floor(Math.random() * 500);
+    const jitterMs = Math.floor(Math.random() * 500);
     await this.db.query(
       `UPDATE inbox_events SET
         status=CASE WHEN attempts >= $3 THEN 'dead' ELSE 'pending' END,
-        available_at=now()+($4::integer * INTERVAL '1 millisecond'),
+        available_at=now()+((LEAST(300000, (1000 * power(2, LEAST(attempts - 1, 8)))::integer) + $4::integer) * INTERVAL '1 millisecond'),
         locked_until=NULL, lock_token=NULL, updated_at=now(),
         last_error=$5
        WHERE id=$1 AND lock_token=$2 AND status='processing' AND locked_until>now()`,
-      [claim.id, claim.lock_token, MAX_ATTEMPTS, retryMs, errorCode],
+      [claim.id, claim.lock_token, MAX_ATTEMPTS, jitterMs, errorCode],
     );
   }
 }
