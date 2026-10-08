@@ -10,5 +10,13 @@
     "!src/main.ts",
     "!src/database.ts",
     "!src/app.module.ts"
-  ]
+  ],
+  "coverageThreshold": {
+    "global": {
+      "branches": 70,
+      "functions": 90,
+      "lines": 90,
+      "statements": 85
+    }
+  }
 }
